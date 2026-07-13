@@ -34,15 +34,18 @@ def get_general_news(limit: int = 5) -> list:
 def get_tech_news(limit: int = 5) -> list:
     try:
         url = f"{WHATSTRENDING_URL}/articles"
-        response = requests.get(url, timeout=10)
+        response = requests.get(url, timeout=15)
         response.raise_for_status()
         data = response.json()
 
-        articles = data.get("articles", [])[:limit]
+        articles = data.get("data", [])[:limit]
+        if not articles:
+            articles = data.get("articles", [])[:limit]
+        
         return [
             {
                 "title": a.get("title", "Sin título"),
-                "summary": a.get("summary", "Sin resumen"),
+                "summary": a.get("summary", "Sin resumen")[:150] + "..." if a.get("summary") else "Sin resumen",
                 "source": a.get("source", "Desconocido"),
                 "category": a.get("category", "General"),
             }

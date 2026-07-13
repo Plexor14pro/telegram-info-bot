@@ -11,6 +11,7 @@ from handlers.weather import weather_command
 from handlers.exchange import dollar_command, euro_command
 from handlers.crypto import crypto_command
 from handlers.news import news_command, tech_command
+from handlers.convert import convert_command
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -36,6 +37,8 @@ def main():
     app.add_handler(CommandHandler("crypto", crypto_command))
     app.add_handler(CommandHandler("noticias", news_command))
     app.add_handler(CommandHandler("tech", tech_command))
+    app.add_handler(CommandHandler("convertir", convert_command))
+    app.add_handler(CommandHandler("convert", convert_command))
 
     async def unknown(update, context):
         await update.message.reply_text(
