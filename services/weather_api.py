@@ -1,5 +1,16 @@
 import requests
+import re
 from config import OPEN_METEO_URL
+
+STOP_WORDS = {
+    "de", "del", "la", "el", "en", "los", "las", "un", "una", "unos", "unas",
+    "al", "a", "y", "o", "que", "por", "con", "para", "sin", "sobre", "entre",
+    "desde", "hasta", "como", "más", "menos", "muy", "poco", "mucho",
+    "ciudad", "pueblo", "pais", "estado", "region", "provincia", "isla",
+    "san", "santa", "santo", "nuevo", "nueva", "viejo", "vieja",
+    "grande", "pequeño", "pequeña", "alto", "alta", "bajo", "baja",
+    "norte", "sur", "este", "oeste", "oriente", "occidente",
+}
 
 WMO_CODES = {
     0: "☀️ Despejado",
@@ -28,36 +39,53 @@ WMO_CODES = {
 GEOCODING_URL = "https://geocoding-api.open-meteo.com/v1/search"
 
 
+def clean_city_name(text: str) -> str:
+    text = text.lower().strip()
+    text = re.sub(r'[^\w\s]', ' ', text)
+    text = re.sub(r'\s+', ' ', text)
+    words = text.split()
+    cleaned = [w for w in words if w not in STOP_WORDS]
+    if not cleaned:
+        cleaned = words
+    result = " ".join(cleaned)
+    return result.strip()
+
+
 def geocode_city(city_name: str) -> dict:
-    params = {
-        "name": city_name,
-        "count": 1,
-        "language": "es",
-        "format": "json",
-    }
-    try:
-        response = requests.get(GEOCODING_URL, params=params, timeout=10)
-        response.raise_for_status()
-        data = response.json()
-        results = data.get("results", [])
-        if results:
-            location = results[0]
-            return {
-                "lat": location.get("latitude"),
-                "lon": location.get("longitude"),
-                "name": location.get("name", city_name),
-                "country": location.get("country", ""),
-                "admin1": location.get("admin1", ""),
-            }
-        return None
-    except Exception:
-        return None
+    cleaned = clean_city_name(city_name)
+    
+    for attempt_name in [cleaned, city_name.lower().strip()]:
+        params = {
+            "name": attempt_name,
+            "count": 1,
+            "language": "es",
+            "format": "json",
+        }
+        try:
+            response = requests.get(GEOCODING_URL, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            results = data.get("results", [])
+            if results:
+                location = results[0]
+                return {
+                    "lat": location.get("latitude"),
+                    "lon": location.get("longitude"),
+                    "name": location.get("name", city_name),
+                    "country": location.get("country", ""),
+                    "admin1": location.get("admin1", ""),
+                }
+        except Exception:
+            continue
+    
+    return None
 
 
 def get_weather(city: str) -> dict:
+    cleaned = clean_city_name(city)
     geo = geocode_city(city)
     if not geo:
-        return {"error": f"No encontré la ciudad: {city}. Intenta con el nombre en español."}
+        return {"error": f"No encontré \"{cleaned}\". Intenta solo con el nombre de la ciudad (ej: Madrid, Tokyo, Buenos Aires)."}
 
     coords = {"lat": geo["lat"], "lon": geo["lon"]}
     city_display = geo["name"]
