@@ -1,5 +1,5 @@
 import requests
-from config import OPEN_METEO_URL, WEATHER_COMMANDS
+from config import OPEN_METEO_URL
 
 WMO_CODES = {
     0: "☀️ Despejado",
@@ -25,15 +25,46 @@ WMO_CODES = {
     99: "⛈️ Tormenta con granizo fuerte",
 }
 
+GEOCODING_URL = "https://geocoding-api.open-meteo.com/v1/search"
+
+
+def geocode_city(city_name: str) -> dict:
+    params = {
+        "name": city_name,
+        "count": 1,
+        "language": "es",
+        "format": "json",
+    }
+    try:
+        response = requests.get(GEOCODING_URL, params=params, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        results = data.get("results", [])
+        if results:
+            location = results[0]
+            return {
+                "lat": location.get("latitude"),
+                "lon": location.get("longitude"),
+                "name": location.get("name", city_name),
+                "country": location.get("country", ""),
+                "admin1": location.get("admin1", ""),
+            }
+        return None
+    except Exception:
+        return None
+
 
 def get_weather(city: str) -> dict:
-    city_lower = city.lower().replace(" ", "").replace("á", "a").replace("é", "e").replace("í", "i").replace("ó", "o").replace("ú", "u")
+    geo = geocode_city(city)
+    if not geo:
+        return {"error": f"No encontré la ciudad: {city}. Intenta con el nombre en español."}
 
-    if city_lower in WEATHER_COMMANDS:
-        coords = WEATHER_COMMANDS[city_lower]
-    else:
-        coords = {"lat": 4.711, "lon": -74.0721}
-        city = "Bogotá"
+    coords = {"lat": geo["lat"], "lon": geo["lon"]}
+    city_display = geo["name"]
+    if geo.get("admin1"):
+        city_display += f", {geo['admin1']}"
+    if geo.get("country"):
+        city_display += f", {geo['country']}"
 
     params = {
         "latitude": coords["lat"],
@@ -65,7 +96,7 @@ def get_weather(city: str) -> dict:
         weather_desc = WMO_CODES.get(weather_code, "❓ Desconocido")
 
         return {
-            "city": city.title(),
+            "city": city_display,
             "weather": weather_desc,
             "temp": temp,
             "feels_like": feels_like,
